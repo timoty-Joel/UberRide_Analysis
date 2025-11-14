@@ -42,23 +42,6 @@ def load_data():
 
 df, df_completed = load_data()
 
-# ------------
-# Sidebar Part
-# ------------
-
-sidebar = st.sidebar.header("Filters")
-
-date_range = st.sidebar.date_input(
-    "Select Date Range",
-    [df['Date'].min(), df['Date'].max()]
-)
-
-vehicle_types = st.sidebar.multiselect(
-    "Select Vehicle Type",
-    options=df['Vehicle Type'].unique(),
-    default=df['Vehicle Type'].unique()
-)
-
 # -----------------
 # KPI Visualization
 # -----------------
