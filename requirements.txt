@@ -1,5 +1,6 @@
 streamlit==1.25.0
 plotly
+plotly.express
 pandas==1.5.3
 seaborn==0.12.2
 matplotlib==3.7.2
