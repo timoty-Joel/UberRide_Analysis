@@ -1,6 +1,10 @@
 import streamlit as st 
 import pandas as pd
 import plotly.express as px 
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # --- Set the Page Title ---
 st.set_page_config(page_title='Uber Analysis Visualization')
@@ -112,7 +116,7 @@ with tab1:
             labels={'x':'Vehicle Type', 'y':'Number of Rides'}
         )
         fig_vehicle.update_layout(
-            xaxis=dict(title="Hour of the Day (0-23)"), # Using 'xaxis'
+            xaxis=dict(title="Vehicle Type"), # Using 'xaxis'
             yaxis=dict(title="Total Number of Rides")
         )
         st.plotly_chart(fig_vehicle, use_container_width=True)
@@ -182,6 +186,97 @@ with tab2:
             labels={'x':'Time Range', 'y':'Number of Rides'}
         )
         st.plotly_chart(fig_timerange, use_container_width=True)
+
+    st.divider()
+    st.subheader("Successful Rides and Success Rate by Hour of Day")
+
+    # --- Data Prep (from your code) ---
+    # 1. Successful Bookings
+    hourly_bookings = (
+        df_completed.groupby('Hour')
+        .size()
+        .reset_index(name='Successful Bookings')
+    )
+    # Ensure all 24 hours are present
+    all_hours_df = pd.DataFrame({'Hour': range(24)})
+    hourly_bookings = pd.merge(all_hours_df, hourly_bookings, on='Hour', how='left').fillna(0)
+
+    # 2. Success Rate
+    success_by_hour = (
+        df.groupby(['Hour', 'Booking Status'])
+        .size()
+        .reset_index(name='Count')
+    )
+    success_pivot = success_by_hour.pivot(index='Hour', columns='Booking Status', values='Count').fillna(0)
+    # Ensure all 24 hours are in the index
+    success_pivot = success_pivot.reindex(range(24), fill_value=0)
+
+    if 'Completed' in success_pivot.columns and not success_pivot.sum(axis=1).eq(0).all():
+        # Calculate rate, handle division by zero (where sum is 0) by resulting in NaN
+        success_pivot['Success Rate (%)'] = (success_pivot['Completed'] / success_pivot.sum(axis=1)) * 100
+    else:
+        success_pivot['Success Rate (%)'] = 0
+        
+    # Convert any NaN (from 0/0) or Inf to 0
+    success_pivot['Success Rate (%)'] = success_pivot['Success Rate (%)'].fillna(0)
+
+    # 3. Merge
+    merged_df = pd.merge(
+        hourly_bookings, 
+        success_pivot[['Success Rate (%)']], 
+        left_on='Hour', 
+        right_index=True, 
+        how='outer'
+    ).fillna(0)
+
+    fig_combo_plotly = make_subplots(specs=[[{"secondary_y": True}]])
+
+    fig_combo_plotly.add_trace(
+        go.Bar(
+            x=merged_df['Hour'],
+            y=merged_df['Successful Bookings'],
+            name='Successful Bookings',  # This name appears in the legend
+            marker_color='royalblue'
+        ),
+        secondary_y=False,  # This is the primary y-axis
+    )
+
+    fig_combo_plotly.add_trace(
+        go.Scatter(
+            x=merged_df['Hour'],
+            y=merged_df['Success Rate (%)'],
+            name='Success Rate (%)',  # This name appears in the legend
+            mode='lines+markers',
+            line=dict(color='green', width=2.5),
+            marker=dict(color='green')
+        ),
+        secondary_y=True,  # This is the secondary y-axis
+    )
+
+    fig_combo_plotly.update_layout(
+        title_text='📊 Successful Rides and Success Rate by Hour of Day',
+        title_font_size=20,
+        xaxis=dict(
+            title='Hour of Day (0-23)',
+            tickmode='linear',  # Show all 24 hour ticks
+            dtick=1
+        ),
+        yaxis=dict(
+            title='Number of Successful Bookings',
+            titlefont=dict(color='royalblue'),
+            tickfont=dict(color='royalblue')
+        ),
+        yaxis2=dict(
+            title='Success Rate (%)',
+            titlefont=dict(color='green'),
+            tickfont=dict(color='green'),
+            range=[0, 100]  # Set range for percentage
+        ),
+        legend=dict(x=0, y=1.1, orientation='h'), # Move legend to the top
+    )
+
+    st.plotly_chart(fig_combo_plotly, use_container_width=True)
+
         
 with tab3:
     st.header("Location and Vehicle Insights")
